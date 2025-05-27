@@ -2,7 +2,7 @@
 import google.generativeai as genai 
 import streamlit as st
 
-st.title("Gemini-Bot")
+st.title("판다스 AI 챗봇 Test 버젼")
 
 @st.cache_resource
 def load_model():
