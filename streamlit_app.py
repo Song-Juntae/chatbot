@@ -1,3 +1,4 @@
+'''
 # st_chatbot.py
 import google.generativeai as genai 
 import streamlit as st
@@ -25,3 +26,4 @@ if prompt := st.chat_input("메시지를 입력하세요."):
     with st.chat_message("ai"):
         response = st.session_state.chat_session.send_message(prompt)        
         st.markdown(response.text)
+'''
