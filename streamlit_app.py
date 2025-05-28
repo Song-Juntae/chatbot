@@ -28,7 +28,7 @@ if prompt := st.chat_input("메시지를 입력하세요."):
         response = st.session_state.chat_session.send_message(prompt)        
         st.markdown(response.text)
 
-st.subheader("_당신의 역할을 _ :blue[정해주세요!] :sunglasses:")
+st.subheader("_당신의 역할을_ :blue[  정해주세요!] :sunglasses:")
 
 left, middle, right = st.columns(3)
 if left.button("기본", use_container_width=True):
