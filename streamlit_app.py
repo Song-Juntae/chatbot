@@ -76,7 +76,6 @@ place_name = st.text_input("분석할 도시 또는 지역 이름:", "Seoul, Sou
 network_type = st.selectbox("네트워크 타입:", ["drive", "walk", "bike", "all"])
 
 if st.button("계산 요청 및 GitHub에 푸시"):
-    # 요청에 고유 ID 및 타임스탬프 추가
     request_id = datetime.now().strftime("%Y%m%d%H%M%S")
     input_data = {
         "request_id": request_id,
