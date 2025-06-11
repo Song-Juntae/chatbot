@@ -63,7 +63,7 @@ OUTPUT_FILE = os.path.join(REPO_DIR, 'output.json')
 # GITHUB_REPO_NAME은 실제 레포지토리 이름이어야 합니다.
 GITHUB_TOKEN = st.secrets["github_token"]
 GITHUB_USERNAME = st.secrets["github_username"] # GitHub 계정 사용자 이름
-GITHUB_REPO_OWNER = st.secrets["github_repo_owner"] # 레포지토리가 속한 계정 (예: 'myusername' 또는 'myorg')
+GITHUB_REPO_OWNER = st.secrets["github_username"] # 레포지토리가 속한 계정 (예: 'myusername' 또는 'myorg')
 GITHUB_REPO_NAME = "chatbot" # 실제 레포지토리 이름
 
 # GitPython이 HTTPS를 통해 인증하도록 URL 구성
