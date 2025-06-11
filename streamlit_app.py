@@ -47,23 +47,29 @@ from datetime import datetime
 #     system_instruction = "당신은 AI 데이터 분석 전문가야. 사용자는 연구자야. 쉽고 친절하게 이야기하되 3문장 이내로 짧게 얘기하세요."
 #     right.markdown("당신은 연구자입니다.")
 
-
 st.set_page_config(layout="wide")
 st.title("OSMnx 원격 계산 요청 앱")
 
 # GitHub 레포지토리 정보 (Streamlit Secrets에서 로드)
 # Streamlit Cloud에서 이 앱이 배포된 GitHub 레포지토리의 경로를 사용합니다.
 # 즉, 이 앱 자체가 git clone 되어있는 상태이므로, os.getcwd()가 레포지토리 루트입니다.
-REPO_DIR = os.getcwd()
+REPO_DIR = os.getcwd() # Streamlit Cloud 앱의 루트 디렉토리
 INPUT_FILE = os.path.join(REPO_DIR, 'input.json')
 OUTPUT_FILE = os.path.join(REPO_DIR, 'output.json')
 
 # GitHub 인증 정보 (Streamlit Secrets에 저장)
+# 실제 GitHub 사용자명과 토큰을 여기에 맞게 설정해주세요.
+# GITHUB_REPO_OWNER는 레포지토리를 소유한 사용자명 또는 조직명이어야 합니다.
+# GITHUB_REPO_NAME은 실제 레포지토리 이름이어야 합니다.
 GITHUB_TOKEN = st.secrets["github_token"]
-GITHUB_USERNAME = st.secrets["github_username"] # 필요시
-GITHUB_REPO_OWNER = st.secrets["github_username"] # 또는 조직명
+GITHUB_USERNAME = st.secrets["github_username"] # GitHub 계정 사용자 이름
+GITHUB_REPO_OWNER = st.secrets["github_repo_owner"] # 레포지토리가 속한 계정 (예: 'myusername' 또는 'myorg')
 GITHUB_REPO_NAME = "chatbot" # 실제 레포지토리 이름
-GITHUB_REPO_URL = f"https://{GITHUB_USERNAME}:{GITHUB_TOKEN}@github.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}.git"
+
+# GitPython이 HTTPS를 통해 인증하도록 URL 구성
+# 이 URL은 GitPython이 내부적으로 Git 명령을 호출할 때 사용됩니다.
+# GitPython은 이 URL을 사용하여 SSH 대신 HTTPS를 통해 인증을 시도합니다.
+GITHUB_REPO_HTTPS_URL = f"https://{GITHUB_USERNAME}:{GITHUB_TOKEN}@github.com/{GITHUB_REPO_OWNER}/{GITHUB_REPO_NAME}.git"
 
 # 1. 입력 받기
 place_name = st.text_input("분석할 도시 또는 지역 이름:", "Seoul, South Korea")
@@ -82,8 +88,24 @@ if st.button("계산 요청 및 GitHub에 푸시"):
     with st.spinner("요청을 GitHub에 푸시 중..."):
         try:
             # 현재 디렉토리에서 Git 레포지토리 로드
+            # Streamlit Cloud는 이미 레포지토리를 클론했으므로, REPO_DIR은 레포지토리 루트입니다.
             repo = Repo(REPO_DIR)
 
+            # 원격 'origin'의 URL을 인증 정보가 포함된 HTTPS URL로 임시 변경
+            # 이렇게 하면 GitPython이 HTTPS를 통해 푸시할 때 인증 정보를 사용합니다.
+            # 이 변경은 현재 GitPython 객체에만 영향을 미치며, 실제 .git/config 파일을 변경하지는 않습니다.
+            # 하지만 GitPython 1.0.0 버전부터는 이렇게 직접적으로 URL을 넘겨주는 방식보다는
+            # git config credential.helper를 설정하거나, 더 안전한 방법인 SSH 키를 사용하는 것이 권장됩니다.
+            # 여기서는 편의를 위해 직접 URL을 설정하는 방식을 사용합니다.
+            origin = repo.remote(name='origin')
+            
+            # ** 중요한 부분: 원격 URL 업데이트 **
+            # GitPython에서 'origin' 원격의 URL을 업데이트하여 토큰을 사용합니다.
+            # 이는 Streamlit Cloud가 기본적으로 HTTPS를 통해 레포지토리를 가져오므로,
+            # 푸시 시에도 HTTPS를 사용할 수 있도록 합니다.
+            # 단, 이 방법이 모든 GitPython 버전 및 환경에서 완벽하게 작동한다는 보장은 없습니다.
+            origin.set_url(GITHUB_REPO_HTTPS_URL)
+            
             # input.json 업데이트
             with open(INPUT_FILE, 'w', encoding='utf-8') as f:
                 json.dump(input_data, f, ensure_ascii=False, indent=4)
@@ -91,24 +113,22 @@ if st.button("계산 요청 및 GitHub에 푸시"):
             # 변경사항 커밋 및 푸시
             repo.index.add([INPUT_FILE])
             repo.index.commit(f"Input request ID: {request_id} for {place_name}")
-
-            # 원격 저장소에 푸시 (인증 정보를 포함한 URL 사용)
-            # git.cmd.Git 대신 repo.remote(name='origin').push()를 사용할 수 있지만
-            # secrets에 포함된 토큰으로 인증하려면 URL에 직접 포함하는 것이 간단합니다.
-            with repo.git.custom_environment(GIT_SSH_COMMAND=f"ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"):
-                # 환경 변수를 사용하여 인증 정보를 분리하는 것이 더 안전하지만,
-                # 여기서는 URL에 직접 포함하는 예시를 보여줍니다.
-                # 실제 배포 시에는 더 안전한 방법을 찾아보시는 것을 권장합니다.
-                # GitPython이 SSH를 사용하는 경우, GITHUB_TOKEN을 패스워드로 사용하는 HTTPS URL이 아닌 SSH 키를 사용하는 방식도 고려할 수 있습니다.
-                # 간단한 HTTPS 인증을 위해 GitPython이 Git 명령어를 호출하도록 합니다.
-                os.system(f'git -c "http.extraheader=AUTHORIZATION: Basic $(echo -n {GITHUB_USERNAME}:{GITHUB_TOKEN} | base64)" -C {REPO_DIR} push origin HEAD')
+            
+            # 푸시 실행
+            # 이 시점에서 GitPython은 이전에 설정된 GITHUB_REPO_HTTPS_URL을 사용하여 푸시를 시도합니다.
+            origin.push()
 
             st.session_state['last_request_id'] = request_id
             st.success("요청이 성공적으로 GitHub에 푸시되었습니다. 회사 컴퓨터에서 계산 중...")
             st.info("결과가 도착하면 이 페이지가 자동으로 업데이트됩니다.")
 
+        except GitCommandError as e:
+            # Git 관련 오류 (인증, 레포지토리 접근 등)
+            st.error(f"Git 명령 실행 중 오류 발생 (GitCommandError): {e.stderr.strip()}")
+            st.session_state['last_request_id'] = None
         except Exception as e:
-            st.error(f"GitHub 푸시 중 오류 발생: {e}")
+            # 기타 오류
+            st.error(f"GitHub 푸시 중 일반 오류 발생: {e}")
             st.session_state['last_request_id'] = None
 
 st.header("계산 결과")
@@ -127,7 +147,7 @@ if os.path.exists(OUTPUT_FILE):
             st.success(f"요청 ID {output_data['request_id']}에 대한 계산 결과가 도착했습니다!")
             st.session_state['last_request_id'] = None # 처리 완료 표시
         else:
-            st.info("최신 계산 결과가 표시됩니다.")
+            st.info("최신 계산 결과가 표시됩니다.") # 과거 결과가 표시될 경우
 
         st.json(output_data)
         # 여기에 Streamlit 지도 시각화 코드 추가 (예: st.map, pydeck, folium)
@@ -152,4 +172,3 @@ else:
 
 st.write("---")
 st.info("이 앱은 Streamlit Cloud에서 GitHub 레포지토리를 통해 회사 컴퓨터와 데이터를 주고받습니다.")
-
